@@ -1,3 +1,48 @@
 spring:
   application:
     name: url-police-server
+
+urlpolice:
+  rules:
+    max-url-length: 200
+    special-char-threshold: 8
+    max-subdomains: 3
+    suspicious-keywords:
+      - login
+      - verify
+      - secure
+      - update
+      - bank
+      - account
+      - confirm
+      - suspend
+      - password
+      - signin
+      - credential
+    shortener-domains:
+      - bit.ly
+      - tinyurl.com
+      - t.co
+      - goo.gl
+      - ow.ly
+      - is.gd
+      - buff.ly
+      - rebrand.ly
+      - bl.ink
+    suspicious-tlds:
+      - tk
+      - ml
+      - ga
+      - cf
+      - gq
+      - xyz
+      - top
+      - club
+      - work
+      - buzz
+      - cam
+      - icu
+    encoded-char-threshold: 3
+  verdict:
+    major-count-threshold: 2
+    risk-score-threshold: 50
