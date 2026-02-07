@@ -3,6 +3,8 @@ spring:
     name: url-police-server
 
 urlpolice:
+  ai:
+    base-url: http://localhost:8000
   rules:
     max-url-length: 200
     special-char-threshold: 8
