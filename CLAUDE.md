@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 4.0 REST API server for the URL Police Android application.
+Spring Boot 4.0 REST API server for the URL Sentinel Android application.
 
 - **Spring Boot 4.0** on **Spring Framework 7.0**
 - **Java 17+** required (compatible up to Java 25)

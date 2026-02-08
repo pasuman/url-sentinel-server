@@ -6,4 +6,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "url-police-server"
+rootProject.name = "url-sentinel-server"

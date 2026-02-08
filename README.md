@@ -1,4 +1,4 @@
-# URL Police Server
+# URL Sentinel Server
 
 REST API server for rule-based phishing URL detection. Receives a URL from a mobile client, evaluates it against configurable detection rules, and returns an ALLOW or REJECT verdict with reason codes.
 
@@ -95,10 +95,10 @@ All rule thresholds and lists are configurable in `application.yml` or via envir
 
 ```bash
 # Examples
-URLPOLICE_RULES_MAX_URL_LENGTH=150
-URLPOLICE_RULES_SPECIAL_CHAR_THRESHOLD=10
-URLPOLICE_VERDICT_MAJOR_COUNT_THRESHOLD=3
-URLPOLICE_VERDICT_RISK_SCORE_THRESHOLD=60
+URLSENTINEL_RULES_MAX_URL_LENGTH=150
+URLSENTINEL_RULES_SPECIAL_CHAR_THRESHOLD=10
+URLSENTINEL_VERDICT_MAJOR_COUNT_THRESHOLD=3
+URLSENTINEL_VERDICT_RISK_SCORE_THRESHOLD=60
 ```
 
 See [`application.yml`](src/main/resources/application.yml) for the full configuration reference.
