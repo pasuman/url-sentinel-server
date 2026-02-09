@@ -10,11 +10,12 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@WebMvcTest(UrlAnalyzeController::class)
+@WebMvcTest(controllers = [UrlAnalyzeController::class, GlobalExceptionHandler::class])
 class UrlAnalyzeControllerTest {
 
     @Autowired
@@ -160,5 +161,21 @@ class UrlAnalyzeControllerTest {
             .andExpect(jsonPath("$.verdict").value("REJECT"))
             .andExpect(jsonPath("$.sslVerification.verdict").value("MISMATCH"))
             .andExpect(jsonPath("$.sslVerification.message").value("Certificate fingerprints do not match. Possible DNS hijacking or MITM attack."))
+    }
+
+    @Test
+    fun `returns 404 for unknown paths`() {
+        mockMvc.perform(get("/unknown-path"))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `returns 404 for unknown POST endpoints`() {
+        mockMvc.perform(
+            post("/api/v1/unknown")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"test": "value"}"""),
+        )
+            .andExpect(status().isNotFound)
     }
 }
