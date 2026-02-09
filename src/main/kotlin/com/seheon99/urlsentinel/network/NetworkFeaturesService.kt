@@ -1,18 +1,17 @@
 package com.seheon99.urlsentinel.network
 
 import com.seheon99.urlsentinel.config.NetworkFeaturesProperties
-import com.seheon99.urlsentinel.ssl.SslCertificateService
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 import kotlin.system.measureTimeMillis
 
 @Service
 class NetworkFeaturesService(
     private val properties: NetworkFeaturesProperties,
-    private val sslCertificateService: SslCertificateService,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -71,7 +70,13 @@ class NetworkFeaturesService(
             "http" -> features["tls_ssl_certificate"] = 0.0
             "https" -> {
                 try {
-                    sslCertificateService.fetchCertificate(url.toString())
+                    // Simple HTTPS connection test to verify certificate validity
+                    val connection = url.openConnection() as HttpsURLConnection
+                    connection.connectTimeout = 10000
+                    connection.readTimeout = 10000
+                    connection.requestMethod = "HEAD"
+                    connection.connect()
+                    connection.disconnect()
                     features["tls_ssl_certificate"] = 1.0
                 } catch (e: Exception) {
                     logger.debug("SSL certificate fetch failed for {}: {}", url, e.message)

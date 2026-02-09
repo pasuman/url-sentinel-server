@@ -1,10 +1,10 @@
 # URL Sentinel Server
 
-REST API server for phishing URL detection and SSL certificate verification. Provides three key security features:
+REST API server for phishing URL detection and SSL/TLS verification. Provides three key security features:
 
-1. **AI-powered phishing detection**: Machine learning model with network feature analysis for advanced threat detection
-2. **Rule-based URL analysis**: Evaluates URLs against configurable detection rules and returns an ALLOW or REJECT verdict
-3. **SSL certificate verification**: Detects DNS hijacking and MITM attacks by comparing SSL certificate fingerprints
+1. **SSL/TLS MITM detection**: Six-check verification system that detects man-in-the-middle attacks, DNS hijacking, and rogue certificates
+2. **AI-powered phishing detection**: Machine learning model with network feature analysis for advanced threat detection
+3. **Rule-based URL analysis**: Evaluates URLs against configurable detection rules and returns an ALLOW or REJECT verdict
 
 ## Tech Stack
 
@@ -37,62 +37,119 @@ POST /analyze
 Content-Type: application/json
 ```
 
-Unified endpoint that performs both phishing detection and optional SSL certificate verification.
+**Security-first endpoint** that performs SSL/TLS verification before URL phishing analysis. SSL verification is **mandatory** - URL analysis only runs if SSL passes with score ≥70.
 
-**Request (URL check only):**
+**Request:**
 ```json
 {
-  "url": "http://192.168.1.1/login/verify"
-}
-```
-
-**Request (URL check + SSL verification):**
-```json
-{
-  "url": "https://www.google.com",
-  "clientFingerprint": "A1:B2:C3:D4:E5:F6:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
-}
-```
-
-**Response (URL check only):**
-```json
-{
-  "verdict": "REJECT",
-  "reasons": [
-    {
-      "code": "IP_ADDRESS_DOMAIN",
-      "severity": "CRITICAL",
-      "message": "URL uses an IP address instead of a domain name"
-    },
-    {
-      "code": "SUSPICIOUS_KEYWORD",
-      "severity": "MAJOR",
-      "message": "URL contains suspicious keywords: login, verify"
-    }
-  ],
-  "riskScore": 60
-}
-```
-
-**Response (with SSL verification):**
-```json
-{
-  "verdict": "ALLOW",
-  "reasons": [],
-  "riskScore": 0,
-  "sslVerification": {
-    "verdict": "MATCH",
-    "serverFingerprint": "A1:B2:C3:...",
-    "clientFingerprint": "A1:B2:C3:...",
-    "certificateDetails": {
-      "subject": "CN=www.google.com",
-      "issuer": "CN=GTS CA 1C3",
-      "validFrom": "2023-01-01T00:00:00Z",
-      "validTo": "2024-01-01T00:00:00Z",
-      "isExpired": false
-    },
-    "message": "Certificate fingerprints match. Connection is secure."
+  "url": "https://example.com",
+  "clientObservation": {
+    "certificateChain": ["-----BEGIN CERTIFICATE-----\n..."],
+    "serverIp": "93.184.216.34",
+    "serverAsn": 15133,
+    "tlsProtocol": "TLSv1.3",
+    "cipherSuite": "TLS_AES_128_GCM_SHA256",
+    "alpnProtocol": "h2"
   }
+}
+```
+
+**Response (SSL passed):**
+```json
+{
+  "sslVerification": {
+    "verdict": "LIKELY_LEGITIMATE",
+    "totalScore": 90,
+    "checks": [
+      {
+        "name": "SPKI_MATCH",
+        "passed": true,
+        "score": 50,
+        "message": "Subject Public Key Info matches"
+      },
+      {
+        "name": "CHAIN_VALIDATES",
+        "passed": true,
+        "score": 10,
+        "message": "Certificate chain is valid and trusted"
+      },
+      {
+        "name": "IP_ASN_MATCH",
+        "passed": true,
+        "score": 20,
+        "message": "ASN matches (AS15133)"
+      },
+      {
+        "name": "CT_LOG_PRESENCE",
+        "passed": true,
+        "score": 30,
+        "message": "Certificate has CT log entry"
+      },
+      {
+        "name": "TLS_METADATA_MATCH",
+        "passed": false,
+        "score": -10,
+        "message": "TLS metadata MISMATCH (1/3 fields match)"
+      }
+    ],
+    "serverCertificate": {
+      "subject": "CN=example.com",
+      "issuer": "CN=DigiCert TLS RSA SHA256 2020 CA1",
+      "validFrom": "2024-01-30T00:00:00Z",
+      "validTo": "2025-03-01T23:59:59Z",
+      "isExpired": false,
+      "spki": "7ab0797e7dd168b228be3bddb49623c9a7b4596b58fd98ce57b2c8135577c31c"
+    }
+  },
+  "urlCheck": {
+    "verdict": "ALLOW",
+    "reasons": [],
+    "riskScore": 0
+  }
+}
+```
+
+**Response (SSL failed - URL check skipped):**
+```json
+{
+  "sslVerification": {
+    "verdict": "LIKELY_INTERCEPTION",
+    "totalScore": 15,
+    "checks": [
+      {
+        "name": "SPKI_MATCH",
+        "passed": false,
+        "score": -40,
+        "message": "Subject Public Key Info MISMATCH - possible MITM attack"
+      },
+      {
+        "name": "CHAIN_VALIDATES",
+        "passed": false,
+        "score": -40,
+        "message": "Certificate chain validation FAILED"
+      },
+      {
+        "name": "IP_ASN_MATCH",
+        "passed": false,
+        "score": -20,
+        "message": "ASN MISMATCH - possible DNS hijacking"
+      },
+      {
+        "name": "CT_LOG_PRESENCE",
+        "passed": true,
+        "score": 30,
+        "message": "Certificate has CT log entry"
+      },
+      {
+        "name": "TLS_METADATA_MATCH",
+        "passed": true,
+        "score": 10,
+        "message": "TLS metadata matches (3/3 fields)"
+      }
+    ],
+    "serverCertificate": { "..." }
+  },
+  "urlCheck": null
 }
 ```
 
@@ -100,33 +157,73 @@ Unified endpoint that performs both phishing detection and optional SSL certific
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `url` | string | Yes | URL to analyze |
-| `clientFingerprint` | string | No | SHA-256 certificate fingerprint for SSL verification |
+| `url` | string | Yes | URL to analyze (must be HTTPS) |
+| `clientObservation` | object | Yes | Client-observed TLS connection metadata |
+| `clientObservation.certificateChain` | string[] | Yes | PEM-encoded X.509 certificates (leaf first) |
+| `clientObservation.serverIp` | string | Yes | IP address client connected to |
+| `clientObservation.serverAsn` | number | No | Autonomous System Number of server IP |
+| `clientObservation.tlsProtocol` | string | Yes | TLS protocol version (e.g., "TLSv1.3") |
+| `clientObservation.cipherSuite` | string | Yes | Negotiated cipher suite |
+| `clientObservation.alpnProtocol` | string | No | ALPN negotiation result (e.g., "h2") |
 
 #### Response Fields
 
 | Field | Description |
 |-------|-------------|
-| `verdict` | `ALLOW` or `REJECT` (from phishing detection) |
-| `reasons` | List of triggered rules with code, severity, and message |
-| `riskScore` | 0-100, sum of triggered rule weights capped at 100 |
-| `sslVerification` | SSL verification results (only present if `clientFingerprint` was provided) |
-
-#### SSL Verification Result
-
-| Field | Description |
-|-------|-------------|
-| `verdict` | `MATCH` (safe), `MISMATCH` (potential attack), or `ERROR` (unable to verify) |
-| `serverFingerprint` | SHA-256 fingerprint of the certificate the server fetched (null on ERROR) |
-| `clientFingerprint` | Client's fingerprint echoed back |
-| `certificateDetails` | Certificate subject, issuer, validity dates, and expiration status (null on ERROR) |
-| `message` | Human-readable explanation of the SSL verdict |
+| `sslVerification` | **Always present** - SSL/TLS verification results |
+| `sslVerification.verdict` | Three-tier: `LIKELY_LEGITIMATE` (≥70), `SUSPICIOUS` (20-69), `LIKELY_INTERCEPTION` (<20) |
+| `sslVerification.totalScore` | Aggregated score from all checks (0-100) |
+| `sslVerification.checks` | Individual check results with scores |
+| `sslVerification.serverCertificate` | Server certificate details |
+| `urlCheck` | **Conditional** - Only present if SSL score ≥70 |
+| `urlCheck.verdict` | `ALLOW` or `REJECT` (from phishing detection) |
+| `urlCheck.reasons` | List of triggered rules |
+| `urlCheck.riskScore` | Phishing risk score (0-100) |
 
 **Validation:**
 - URL must not be blank (returns 400)
-- If `clientFingerprint` is provided and URL uses HTTP, SSL verification will fail with ERROR verdict
+- URL must use HTTPS protocol (SSL verification requires TLS)
+- `clientObservation` is mandatory (cannot skip SSL verification)
 
-## Detection Rules
+## SSL/TLS Verification Checks
+
+The verification system runs **6 independent checks** that compare client-observed TLS metadata against server-side observations to detect MITM attacks:
+
+| Check | Pass/Fail Score | Purpose |
+|-------|----------------|---------|
+| **SPKI_MATCH** | +50 / -40 | Compares public keys - different keys indicate MITM |
+| **IP_ASN_MATCH** | +20 / -20 | Verifies network location - detects DNS hijacking |
+| **CT_LOG_PRESENCE** | +30 / -15 | Checks Certificate Transparency - detects rogue/self-signed certs |
+| **TLS_METADATA_MATCH** | +10 / -10 | Compares protocol/cipher/ALPN - detects connection tampering |
+| **CHAIN_VALIDATES** | +10 / -40 | Validates certificate chain against system trust store |
+| **MULTI_REGION_CONSISTENCY** | +5 / 0 | *(Optional, disabled by default)* Multi-vantage point check |
+
+### Verdict Thresholds
+
+- **LIKELY_LEGITIMATE** (score ≥ 70): Connection appears authentic, proceed with URL analysis
+- **SUSPICIOUS** (20 ≤ score < 70): Some checks failed but not conclusive
+- **LIKELY_INTERCEPTION** (score < 20): Strong indicators of MITM attack, URL analysis skipped
+
+### Example Scenarios
+
+**Legitimate connection (all checks pass):**
+```
+SPKI: +50, ASN: +20, CT: +30, TLS: +10, CHAIN: +10 = 120 → capped at 100 → LIKELY_LEGITIMATE
+```
+
+**MITM attack (SPKI fails, others pass):**
+```
+SPKI: -40, ASN: +20, CT: +30, TLS: +10, CHAIN: +10 = 30 → SUSPICIOUS
+```
+
+**Self-signed MITM (multiple failures):**
+```
+SPKI: -40, ASN: -20, CT: -15, TLS: -10, CHAIN: -40 = -125 → clamped to 0 → LIKELY_INTERCEPTION
+```
+
+## URL Phishing Detection Rules
+
+**Note:** URL analysis only runs if SSL verification passes with score ≥70.
 
 | Rule | Code | Severity | Description |
 |------|------|----------|-------------|
@@ -170,9 +267,25 @@ Severity weights: CRITICAL = 40, MAJOR = 20, MINOR = 10.
 
 ## Configuration
 
-All rule thresholds and lists are configurable in `application.yml` or via environment variables:
+All thresholds, checks, and rules are configurable in `application.yml` or via environment variables:
 
 ```bash
+# SSL Verification
+URLSENTINEL_VERIFICATION_ENABLED=true
+URLSENTINEL_VERIFICATION_LEGITIMATE_THRESHOLD=70
+URLSENTINEL_VERIFICATION_SUSPICIOUS_THRESHOLD=20
+
+# Individual check configuration
+URLSENTINEL_VERIFICATION_CHECKS_SPKI_MATCH_ENABLED=true
+URLSENTINEL_VERIFICATION_CHECKS_SPKI_MATCH_PASS_SCORE=50
+URLSENTINEL_VERIFICATION_CHECKS_SPKI_MATCH_FAIL_SCORE=-40
+
+URLSENTINEL_VERIFICATION_CHECKS_IP_ASN_MATCH_ENABLED=true
+URLSENTINEL_VERIFICATION_CHECKS_IP_ASN_MATCH_PASS_SCORE=20
+URLSENTINEL_VERIFICATION_CHECKS_IP_ASN_MATCH_FAIL_SCORE=-20
+
+# ... (similar for ct-log, tls-metadata, chain-validation, multi-region)
+
 # Rule thresholds
 URLSENTINEL_RULES_MAX_URL_LENGTH=150
 URLSENTINEL_RULES_SPECIAL_CHAR_THRESHOLD=10
@@ -196,57 +309,81 @@ See [`application.yml`](src/main/resources/application.yml) for the full configu
 
 ## Architecture
 
-The system follows a clean layered architecture:
+The system follows a **security-first, clean layered architecture**:
 
 ```
 [ Android Client ]
         ↓
 [ Sentinel Server (Spring Boot) ]
-   ├─ Rule Engine          → Executes phishing detection rules
-   ├─ Decision Engine      → Aggregates results into ALLOW/REJECT verdict
+   ├─ Verification Engine  → SSL/TLS MITM detection (runs FIRST)
+   ├─ Rule Engine          → URL phishing detection (conditional)
+   ├─ Decision Engine      → Aggregates results into verdicts
    ├─ AI Adapter           → Interfaces with external AI service
    └─ Policy Store         → Configuration (YAML / Properties)
         ↓
 [ AI Service (FastAPI + LightGBM) ]
 ```
 
-### Request Flow
+### Request Flow (SSL-First)
 
 ```
 POST /analyze
   -> UrlAnalyzeController
     |
-    +-> RuleEngine
-    |     ├─ AiModelRule
-    |     |   ├─ NetworkFeaturesService (DNS, SSL, HTTP features)
-    |     |   └─ AiAdapter → POST /classify to AI service
-    |     ├─ UrlLengthRule
-    |     ├─ IpAddressDomainRule
-    |     ├─ SuspiciousKeywordRule
-    |     └─ [Other PhishingRule implementations...]
-    |     |
-    |     └─ DecisionEngine (DefaultDecisionEngine)
-    |         ├─ Policy Store (VerdictProperties)
-    |         └─ Returns: ALLOW or REJECT verdict
+    +---> 1. VerificationEngine (MANDATORY, ALWAYS FIRST)
+    |       ├─ ServerDataFetcher
+    |       |   └─ Fetches server-side TLS metadata
+    |       ├─ SpkiMatchCheck
+    |       ├─ ChainValidatesCheck
+    |       ├─ IpAsnMatchCheck
+    |       ├─ CtLogPresenceCheck
+    |       ├─ TlsMetadataMatchCheck
+    |       └─ MultiRegionConsistencyCheck
+    |       |
+    |       └─ VerificationDecisionEngine
+    |           ├─ Calculates total score (0-100)
+    |           └─ Returns: LIKELY_LEGITIMATE / SUSPICIOUS / LIKELY_INTERCEPTION
     |
-    +-> SslCertificateService (if clientFingerprint provided)
-    |     └─ Verify certificate fingerprints
+    +---> 2. RuleEngine (ONLY if SSL score ≥ 70)
+    |       ├─ AiModelRule
+    |       |   ├─ NetworkFeaturesService (DNS, SSL, HTTP features)
+    |       |   └─ AiAdapter → POST /classify to AI service
+    |       ├─ UrlLengthRule
+    |       ├─ IpAddressDomainRule
+    |       ├─ SuspiciousKeywordRule
+    |       └─ [Other PhishingRule implementations...]
+    |       |
+    |       └─ DecisionEngine (DefaultDecisionEngine)
+    |           ├─ Policy Store (VerdictProperties)
+    |           └─ Returns: ALLOW or REJECT verdict
     |
-    └─ UrlAnalyzeResponse (verdict + reasons + optional SSL result)
+    └─ UrlAnalyzeResponse
+        ├─ sslVerification (always present)
+        └─ urlCheck (only if SSL passed)
 ```
 
 ### Component Details
 
+**Verification Engine:**
+- Orchestrates SSL/TLS verification checks (always runs first)
+- Each check implements `VerificationCheck` fun interface
+- Checks are auto-discovered by Spring via `@Component`
+- Fetches server-side TLS data and compares with client observations
+- Returns aggregated score (0-100) and three-tier verdict
+- Fail-open for external services (ASN lookup, CT logs)
+
 **Rule Engine:**
-- Coordinates execution of all `PhishingRule` implementations
+- Coordinates execution of all `PhishingRule` implementations (only if SSL ≥70)
 - Each rule is auto-discovered by Spring via `@Component`
 - Rules evaluate independently and return `RuleResult` (triggered, severity, message)
 - Adding new rules: create a single file implementing `PhishingRule` interface
 
 **Decision Engine:**
-- Aggregates rule results into final verdict using configurable policy
-- Default policy: REJECT if CRITICAL rule triggers, ≥2 MAJOR rules, or risk score ≥50
-- Extensible: implement `DecisionEngine` interface for custom logic
+- Two separate engines:
+  - `VerificationDecisionEngine`: Maps SSL scores to verdicts
+  - `DefaultDecisionEngine`: Aggregates phishing rule results
+- Default phishing policy: REJECT if CRITICAL rule triggers, ≥2 MAJOR rules, or risk score ≥50
+- Extensible: implement interfaces for custom logic
 
 **AI Adapter:**
 - Abstracts communication with external AI service
@@ -257,11 +394,12 @@ POST /analyze
 **Policy Store:**
 - Configuration via `application.yml` and `@ConfigurationProperties`
 - Environment variables: `URLSENTINEL_*` prefix
+- Separate config for verification checks and phishing rules
 - Supports runtime configuration updates
 
 **Network Features Collection:**
 - DNS: Uses `InetAddress.getAllByName()` for IP resolution and timing
-- SSL: Delegates to `SslCertificateService` for certificate validation
+- SSL: Direct HTTPS connection for certificate validation
 - HTTP: Follows redirect chain with HEAD requests and configurable timeouts
 - Error handling: Individual feature failures return -1.0 (missing value)
 - Performance: Sequential collection, ~500-2000ms worst case
