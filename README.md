@@ -30,21 +30,31 @@ The server starts on `http://localhost:8080` by default.
 
 ## API
 
-### Check URL
+### Analyze URL
 
 ```
-POST /api/v1/url/check
+POST /analyze
 Content-Type: application/json
 ```
 
-**Request:**
+Unified endpoint that performs both phishing detection and optional SSL certificate verification.
+
+**Request (URL check only):**
 ```json
 {
   "url": "http://192.168.1.1/login/verify"
 }
 ```
 
-**Response:**
+**Request (URL check + SSL verification):**
+```json
+{
+  "url": "https://www.google.com",
+  "clientFingerprint": "A1:B2:C3:D4:E5:F6:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
+}
+```
+
+**Response (URL check only):**
 ```json
 {
   "verdict": "REJECT",
@@ -64,67 +74,45 @@ Content-Type: application/json
 }
 ```
 
+**Response (with SSL verification):**
+```json
+{
+  "verdict": "ALLOW",
+  "reasons": [],
+  "riskScore": 0,
+  "sslVerification": {
+    "verdict": "MATCH",
+    "serverFingerprint": "A1:B2:C3:...",
+    "clientFingerprint": "A1:B2:C3:...",
+    "certificateDetails": {
+      "subject": "CN=www.google.com",
+      "issuer": "CN=GTS CA 1C3",
+      "validFrom": "2023-01-01T00:00:00Z",
+      "validTo": "2024-01-01T00:00:00Z",
+      "isExpired": false
+    },
+    "message": "Certificate fingerprints match. Connection is secure."
+  }
+}
+```
+
+#### Request Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `url` | string | Yes | URL to analyze |
+| `clientFingerprint` | string | No | SHA-256 certificate fingerprint for SSL verification |
+
+#### Response Fields
+
 | Field | Description |
 |-------|-------------|
-| `verdict` | `ALLOW` or `REJECT` |
-| `reasons` | List of triggered rules with code, severity, and human-readable message |
+| `verdict` | `ALLOW` or `REJECT` (from phishing detection) |
+| `reasons` | List of triggered rules with code, severity, and message |
 | `riskScore` | 0-100, sum of triggered rule weights capped at 100 |
+| `sslVerification` | SSL verification results (only present if `clientFingerprint` was provided) |
 
-### Verify SSL Certificate
-
-```
-POST /api/v1/ssl/verify
-Content-Type: application/json
-```
-
-Verifies SSL certificate fingerprints to detect DNS hijacking, pharming, and MITM attacks. The client sends the SSL certificate fingerprint it observes, and the server independently fetches the same URL's certificate and compares fingerprints.
-
-**Request:**
-```json
-{
-  "url": "https://www.google.com",
-  "clientFingerprint": "A1:B2:C3:D4:E5:F6:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
-}
-```
-
-**Response (MATCH):**
-```json
-{
-  "verdict": "MATCH",
-  "serverFingerprint": "A1:B2:C3:D4:E5:F6:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
-  "clientFingerprint": "A1:B2:C3:D4:E5:F6:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
-  "certificateDetails": {
-    "subject": "CN=www.google.com",
-    "issuer": "CN=GTS CA 1C3",
-    "validFrom": "2023-01-01T00:00:00Z",
-    "validTo": "2024-01-01T00:00:00Z",
-    "isExpired": false
-  },
-  "message": "Certificate fingerprints match. Connection is secure."
-}
-```
-
-**Response (MISMATCH):**
-```json
-{
-  "verdict": "MISMATCH",
-  "serverFingerprint": "AA:BB:CC:...",
-  "clientFingerprint": "11:22:33:...",
-  "certificateDetails": { ... },
-  "message": "Certificate fingerprints do not match. Possible DNS hijacking or MITM attack."
-}
-```
-
-**Response (ERROR):**
-```json
-{
-  "verdict": "ERROR",
-  "serverFingerprint": null,
-  "clientFingerprint": "00:00:00:...",
-  "certificateDetails": null,
-  "message": "Unable to resolve hostname"
-}
-```
+#### SSL Verification Result
 
 | Field | Description |
 |-------|-------------|
@@ -132,12 +120,11 @@ Verifies SSL certificate fingerprints to detect DNS hijacking, pharming, and MIT
 | `serverFingerprint` | SHA-256 fingerprint of the certificate the server fetched (null on ERROR) |
 | `clientFingerprint` | Client's fingerprint echoed back |
 | `certificateDetails` | Certificate subject, issuer, validity dates, and expiration status (null on ERROR) |
-| `message` | Human-readable explanation of the verdict |
+| `message` | Human-readable explanation of the SSL verdict |
 
 **Validation:**
-- URL must use HTTPS protocol (returns 400 for HTTP)
 - URL must not be blank (returns 400)
-- Client fingerprint must be valid SHA-256 hash format (returns 400)
+- If `clientFingerprint` is provided and URL uses HTTP, SSL verification will fail with ERROR verdict
 
 ## Detection Rules
 
@@ -209,17 +196,24 @@ See [`application.yml`](src/main/resources/application.yml) for the full configu
 
 ## Architecture
 
-### URL Check Flow
+### Unified Analyze Flow
 ```
-POST /api/v1/url/check
-  -> UrlCheckController
-    -> RuleEngine (executes all PhishingRule beans)
-      -> AiModelRule
-        -> NetworkFeaturesService (collect DNS, SSL, HTTP features)
-        -> AiClassifyClient (POST to url-sentinel-ai)
-      -> [Other rules: UrlLengthRule, IpAddressDomainRule, etc.]
-      -> DefaultVerdictPolicy (aggregates results into ALLOW/REJECT)
-        -> UrlCheckResponse
+POST /analyze
+  -> UrlAnalyzeController
+    |
+    +-> RuleEngine (executes all PhishingRule beans)
+    |     -> AiModelRule
+    |       -> NetworkFeaturesService (collect DNS, SSL, HTTP features)
+    |       -> AiClassifyClient (POST to url-sentinel-ai)
+    |     -> [Other rules: UrlLengthRule, IpAddressDomainRule, etc.]
+    |     -> DefaultVerdictPolicy (aggregates results into ALLOW/REJECT)
+    |
+    +-> SslCertificateService (if clientFingerprint provided)
+          -> fetchCertificate() (HTTPS connection to get server cert)
+          -> computeFingerprint() (SHA-256 hash)
+          -> Compare with client fingerprint
+    |
+    -> UrlAnalyzeResponse (combines both results)
 ```
 
 Each rule implements the `PhishingRule` fun interface and is auto-discovered by Spring as a `@Component`. Adding a new rule requires only creating a single file.
@@ -230,17 +224,6 @@ Each rule implements the `PhishingRule` fun interface and is auto-discovered by 
 - HTTP: Follows redirect chain with HEAD requests and configurable timeouts
 - Error handling: Individual feature failures return -1.0 (missing value)
 - Performance: Sequential collection, ~500-2000ms worst case (DNS + SSL + HTTP)
-
-### SSL Verification Flow
-```
-POST /api/v1/ssl/verify
-  -> SslVerifyController
-    -> SslCertificateService
-      -> fetchCertificate() (HTTPS connection to get server cert)
-      -> computeFingerprint() (SHA-256 hash)
-      -> Compare with client fingerprint
-        -> SslVerifyResponse (MATCH/MISMATCH/ERROR)
-```
 
 ## License
 
