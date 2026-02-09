@@ -5,6 +5,20 @@ spring:
 urlsentinel:
   ai:
     base-url: http://localhost:8000
+  ssl:
+    connect-timeout: 10000
+    read-timeout: 10000
+  network-features:
+    enabled: true
+    dns:
+      enabled: true
+    ssl:
+      enabled: true
+    http:
+      enabled: true
+      connect-timeout: 5000
+      read-timeout: 5000
+      max-redirects: 10
   rules:
     max-url-length: 200
     special-char-threshold: 8

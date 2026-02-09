@@ -2,8 +2,10 @@ package com.seheon99.urlsentinel.rule.rules
 
 import com.seheon99.urlsentinel.ai.AiClassifyClient
 import com.seheon99.urlsentinel.ai.AiClassifyResponse
+import com.seheon99.urlsentinel.network.NetworkFeaturesService
 import com.seheon99.urlsentinel.rule.Severity
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.anyString
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import kotlin.test.assertEquals
@@ -13,11 +15,15 @@ import kotlin.test.assertTrue
 class AiModelRuleTest {
 
     private val client = mock(AiClassifyClient::class.java)
-    private val rule = AiModelRule(client)
+    private val networkFeaturesService = mock(NetworkFeaturesService::class.java)
+    private val rule = AiModelRule(client, networkFeaturesService)
 
     @Test
     fun `phishing URL triggers with CRITICAL severity`() {
-        `when`(client.classify("http://evil.com/login")).thenReturn(
+        `when`(networkFeaturesService.collectFeatures(anyString())).thenReturn(
+            mapOf("time_response" to 100.0, "qty_ip_resolved" to 1.0)
+        )
+        `when`(client.classify(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(
             AiClassifyResponse(url = "http://evil.com/login", phishingProbability = 0.92, isPhishing = true),
         )
 
@@ -30,7 +36,10 @@ class AiModelRuleTest {
 
     @Test
     fun `legit URL does not trigger`() {
-        `when`(client.classify("https://www.google.com")).thenReturn(
+        `when`(networkFeaturesService.collectFeatures(anyString())).thenReturn(
+            mapOf("time_response" to 50.0, "qty_ip_resolved" to 2.0, "tls_ssl_certificate" to 1.0)
+        )
+        `when`(client.classify(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(
             AiClassifyResponse(url = "https://www.google.com", phishingProbability = 0.05, isPhishing = false),
         )
 
@@ -40,7 +49,20 @@ class AiModelRuleTest {
 
     @Test
     fun `AI service failure does not trigger (fail-open)`() {
-        `when`(client.classify("https://example.com")).thenThrow(RuntimeException("Connection refused"))
+        `when`(networkFeaturesService.collectFeatures(anyString())).thenReturn(emptyMap())
+        `when`(client.classify(anyString(), org.mockito.ArgumentMatchers.any())).thenThrow(RuntimeException("Connection refused"))
+
+        val result = rule.evaluate("https://example.com")
+        assertFalse(result.triggered)
+    }
+
+    @Test
+    fun `network features collection failure does not prevent AI call`() {
+        `when`(networkFeaturesService.collectFeatures(anyString()))
+            .thenThrow(RuntimeException("DNS timeout"))
+        `when`(client.classify(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(
+            AiClassifyResponse(url = "https://example.com", phishingProbability = 0.3, isPhishing = false),
+        )
 
         val result = rule.evaluate("https://example.com")
         assertFalse(result.triggered)
