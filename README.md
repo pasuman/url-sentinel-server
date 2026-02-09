@@ -196,34 +196,75 @@ See [`application.yml`](src/main/resources/application.yml) for the full configu
 
 ## Architecture
 
-### Unified Analyze Flow
+The system follows a clean layered architecture:
+
+```
+[ Android Client ]
+        ↓
+[ Sentinel Server (Spring Boot) ]
+   ├─ Rule Engine          → Executes phishing detection rules
+   ├─ Decision Engine      → Aggregates results into ALLOW/REJECT verdict
+   ├─ AI Adapter           → Interfaces with external AI service
+   └─ Policy Store         → Configuration (YAML / Properties)
+        ↓
+[ AI Service (FastAPI + LightGBM) ]
+```
+
+### Request Flow
+
 ```
 POST /analyze
   -> UrlAnalyzeController
     |
-    +-> RuleEngine (executes all PhishingRule beans)
-    |     -> AiModelRule
-    |       -> NetworkFeaturesService (collect DNS, SSL, HTTP features)
-    |       -> AiClassifyClient (POST to url-sentinel-ai)
-    |     -> [Other rules: UrlLengthRule, IpAddressDomainRule, etc.]
-    |     -> DefaultVerdictPolicy (aggregates results into ALLOW/REJECT)
+    +-> RuleEngine
+    |     ├─ AiModelRule
+    |     |   ├─ NetworkFeaturesService (DNS, SSL, HTTP features)
+    |     |   └─ AiAdapter → POST /classify to AI service
+    |     ├─ UrlLengthRule
+    |     ├─ IpAddressDomainRule
+    |     ├─ SuspiciousKeywordRule
+    |     └─ [Other PhishingRule implementations...]
+    |     |
+    |     └─ DecisionEngine (DefaultDecisionEngine)
+    |         ├─ Policy Store (VerdictProperties)
+    |         └─ Returns: ALLOW or REJECT verdict
     |
     +-> SslCertificateService (if clientFingerprint provided)
-          -> fetchCertificate() (HTTPS connection to get server cert)
-          -> computeFingerprint() (SHA-256 hash)
-          -> Compare with client fingerprint
+    |     └─ Verify certificate fingerprints
     |
-    -> UrlAnalyzeResponse (combines both results)
+    └─ UrlAnalyzeResponse (verdict + reasons + optional SSL result)
 ```
 
-Each rule implements the `PhishingRule` fun interface and is auto-discovered by Spring as a `@Component`. Adding a new rule requires only creating a single file.
+### Component Details
+
+**Rule Engine:**
+- Coordinates execution of all `PhishingRule` implementations
+- Each rule is auto-discovered by Spring via `@Component`
+- Rules evaluate independently and return `RuleResult` (triggered, severity, message)
+- Adding new rules: create a single file implementing `PhishingRule` interface
+
+**Decision Engine:**
+- Aggregates rule results into final verdict using configurable policy
+- Default policy: REJECT if CRITICAL rule triggers, ≥2 MAJOR rules, or risk score ≥50
+- Extensible: implement `DecisionEngine` interface for custom logic
+
+**AI Adapter:**
+- Abstracts communication with external AI service
+- Current implementation: `RestAiAdapter` (HTTP REST)
+- Sends URL + network features → receives phishing probability
+- Fail-open: AI unavailability doesn't block URL checks
+
+**Policy Store:**
+- Configuration via `application.yml` and `@ConfigurationProperties`
+- Environment variables: `URLSENTINEL_*` prefix
+- Supports runtime configuration updates
 
 **Network Features Collection:**
 - DNS: Uses `InetAddress.getAllByName()` for IP resolution and timing
 - SSL: Delegates to `SslCertificateService` for certificate validation
 - HTTP: Follows redirect chain with HEAD requests and configurable timeouts
 - Error handling: Individual feature failures return -1.0 (missing value)
-- Performance: Sequential collection, ~500-2000ms worst case (DNS + SSL + HTTP)
+- Performance: Sequential collection, ~500-2000ms worst case
 
 ## License
 

@@ -1,6 +1,6 @@
 package com.seheon99.urlsentinel.rule.rules
 
-import com.seheon99.urlsentinel.ai.AiClassifyClient
+import com.seheon99.urlsentinel.adapter.AiAdapter
 import com.seheon99.urlsentinel.network.NetworkFeaturesService
 import com.seheon99.urlsentinel.rule.PhishingRule
 import com.seheon99.urlsentinel.rule.RuleResult
@@ -8,9 +8,15 @@ import com.seheon99.urlsentinel.rule.Severity
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
+/**
+ * AI Model Rule: Uses external AI service for phishing detection.
+ *
+ * Integrates with the AI Adapter to leverage machine learning models
+ * (LightGBM ensemble) with network features for advanced threat detection.
+ */
 @Component
 class AiModelRule(
-    private val aiClassifyClient: AiClassifyClient,
+    private val aiAdapter: AiAdapter,
     private val networkFeaturesService: NetworkFeaturesService,
 ) : PhishingRule {
 
@@ -25,8 +31,8 @@ class AiModelRule(
             emptyMap()
         }
 
-        val response = try {
-            aiClassifyClient.classify(url, networkFeatures.ifEmpty { null })
+        val result = try {
+            aiAdapter.classify(url, networkFeatures.ifEmpty { null })
         } catch (e: Exception) {
             logger.warn("AI service unavailable, skipping AI rule: {}", e.message)
             return RuleResult(
@@ -38,11 +44,11 @@ class AiModelRule(
         }
 
         return RuleResult(
-            triggered = response.isPhishing,
+            triggered = result.isPhishing,
             code = "AI_MODEL_PHISHING",
             severity = Severity.CRITICAL,
-            message = if (response.isPhishing)
-                "AI model flagged as phishing (probability: ${"%.2f".format(response.phishingProbability)})"
+            message = if (result.isPhishing)
+                "AI model flagged as phishing (probability: ${"%.2f".format(result.phishingProbability)})"
             else "",
         )
     }

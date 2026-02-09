@@ -1,6 +1,7 @@
 package com.seheon99.urlsentinel.rule
 
 import com.seheon99.urlsentinel.config.VerdictProperties
+import com.seheon99.urlsentinel.decision.DefaultDecisionEngine
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -15,7 +16,7 @@ class RuleEngineTest {
 
         val engine = RuleEngine(
             rules = listOf(rule1, rule2, rule3),
-            verdictPolicy = DefaultVerdictPolicy(VerdictProperties()),
+            decisionEngine = DefaultDecisionEngine(VerdictProperties()),
         )
 
         val response = engine.evaluate("https://test.com")
@@ -33,7 +34,7 @@ class RuleEngineTest {
 
         val engine = RuleEngine(
             rules = rules,
-            verdictPolicy = DefaultVerdictPolicy(VerdictProperties()),
+            decisionEngine = DefaultDecisionEngine(VerdictProperties()),
         )
 
         val response = engine.evaluate("https://test.com")
@@ -47,7 +48,7 @@ class RuleEngineTest {
 
         val engine = RuleEngine(
             rules = listOf(rule),
-            verdictPolicy = DefaultVerdictPolicy(VerdictProperties()),
+            decisionEngine = DefaultDecisionEngine(VerdictProperties()),
         )
 
         val response = engine.evaluate("https://www.google.com")
