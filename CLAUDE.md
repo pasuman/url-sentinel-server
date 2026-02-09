@@ -27,6 +27,33 @@ Spring Boot 4.0 REST API server for the URL Sentinel Android application.
 - Dependency management: `io.spring.dependency-management`
 - Snapshot repo required: `https://repo.spring.io/snapshot`
 
+### Key Components
+
+**Rule Engine:**
+- `PhishingRule` fun interface → implemented by rule components
+- `RuleEngine` service → executes all rules
+- `VerdictPolicy` → aggregates results into ALLOW/REJECT
+- Each rule is a `@Component` auto-discovered by Spring
+
+**AI Integration:**
+- `AiModelRule` → calls AI service with network features
+- `NetworkFeaturesService` → collects DNS/SSL/HTTP features
+- `AiClassifyClient` → REST client for url-sentinel-ai service
+- Best-effort collection with fail-open behavior
+
+**Network Features:**
+- DNS: `time_response`, `qty_ip_resolved` (using `InetAddress`)
+- SSL: `tls_ssl_certificate` (0/1/-1, reuses `SslCertificateService`)
+- HTTP: `qty_redirects` (follows redirect chain with HEAD requests)
+- Configuration: Three-tier enable/disable (master + per-feature)
+- Timeouts: 5s for HTTP, 10s for SSL
+- Error handling: Failed features return -1.0
+
+**Configuration:**
+- `@ConfigurationProperties` with `@ConfigurationPropertiesScan`
+- See `application.yml` for all configurable values
+- Environment variables: `URLSENTINEL_*` prefix
+
 ## MCP rules
 
 - Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
