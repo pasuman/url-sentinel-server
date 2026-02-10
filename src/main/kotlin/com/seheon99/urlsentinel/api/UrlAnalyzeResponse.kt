@@ -1,32 +1,19 @@
 package com.seheon99.urlsentinel.api
 
 import com.seheon99.urlsentinel.rule.Verdict
-import com.seheon99.urlsentinel.verification.VerificationVerdict
 
 /**
  * Response from /analyze endpoint.
- * SSL verification is ALWAYS performed first, URL check is conditional.
+ * Simplified to focus on URL phishing detection only.
  */
 data class UrlAnalyzeResponse(
-    val sslVerification: SslVerificationResult,  // MANDATORY (always present)
-    val urlCheck: UrlCheckResult? = null         // OPTIONAL (only if SSL passed with score >= 70)
-)
-
-/**
- * SSL/TLS verification results.
- */
-data class SslVerificationResult(
-    val verdict: VerificationVerdict,  // Three-tier: LIKELY_LEGITIMATE, SUSPICIOUS, LIKELY_INTERCEPTION
-    val totalScore: Int,
-    val checks: List<CheckDetail>,
-    val serverCertificate: CertificateInfo
-)
-
-/**
- * URL phishing detection results.
- */
-data class UrlCheckResult(
-    val verdict: Verdict,         // ALLOW or REJECT
+    val verdict: Verdict,
     val reasons: List<ReasonDetail>,
     val riskScore: Int
+)
+
+data class ReasonDetail(
+    val code: String,
+    val severity: String,
+    val message: String,
 )

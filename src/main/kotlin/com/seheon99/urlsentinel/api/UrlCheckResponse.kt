@@ -7,9 +7,3 @@ data class UrlCheckResponse(
     val reasons: List<ReasonDetail>,
     val riskScore: Int,
 )
-
-data class ReasonDetail(
-    val code: String,
-    val severity: String,
-    val message: String,
-)

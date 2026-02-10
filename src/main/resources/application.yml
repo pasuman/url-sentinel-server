@@ -13,35 +13,6 @@ urlsentinel:
   ssl:
     connect-timeout: 10000
     read-timeout: 10000
-  verification:
-    enabled: true
-    legitimate-threshold: 70
-    suspicious-threshold: 20
-    checks:
-      spki-match:
-        enabled: true
-        pass-score: 50
-        fail-score: -40
-      ip-asn-match:
-        enabled: true
-        pass-score: 20
-        fail-score: -20
-      ct-log:
-        enabled: true
-        pass-score: 30
-        fail-score: -15
-      tls-metadata:
-        enabled: true
-        pass-score: 10
-        fail-score: -10
-      chain-validation:
-        enabled: true
-        pass-score: 10
-        fail-score: -10
-      multi-region:
-        enabled: false
-        pass-score: 5
-        fail-score: 0
   network-features:
     enabled: true
     dns:
