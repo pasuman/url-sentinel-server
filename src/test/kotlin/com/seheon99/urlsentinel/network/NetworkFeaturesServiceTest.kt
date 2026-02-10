@@ -71,6 +71,84 @@ class NetworkFeaturesServiceTest {
         val features = service.collectFeatures("http://example.com")
 
         assertThat(features).doesNotContainKey("qty_redirects")
+        assertThat(features).doesNotContainKey("url_shortened")
+    }
+
+    @Test
+    fun `DNS advanced features disabled when individual toggles are false`() {
+        val properties = NetworkFeaturesProperties(
+            dns = NetworkFeaturesProperties.DnsProperties(
+                enabled = true,
+                spfEnabled = false,
+                mxEnabled = false,
+                nsEnabled = false,
+                ttlEnabled = false
+            )
+        )
+        val service = NetworkFeaturesService(properties)
+
+        val features = service.collectFeatures("http://example.com")
+
+        // Basic DNS features should still be present
+        assertThat(features).containsKeys("time_response", "qty_ip_resolved")
+        // Advanced features should not be present
+        assertThat(features).doesNotContainKey("domain_spf")
+        assertThat(features).doesNotContainKey("qty_mx_servers")
+        assertThat(features).doesNotContainKey("qty_nameservers")
+        assertThat(features).doesNotContainKey("ttl_hostname")
+    }
+
+    @Test
+    fun `URL shortener detection identifies known shorteners`() {
+        val service = NetworkFeaturesService(defaultProperties)
+
+        // Test known shorteners
+        val shortenerUrls = listOf(
+            "https://bit.ly/abc123",
+            "https://tinyurl.com/xyz",
+            "https://t.co/abc",
+            "https://goo.gl/maps/test",
+            "https://custom.bit.ly/link"
+        )
+
+        for (url in shortenerUrls) {
+            val features = service.collectFeatures(url)
+            assertThat(features["url_shortened"])
+                .describedAs("URL $url should be identified as shortener")
+                .isEqualTo(1.0)
+        }
+    }
+
+    @Test
+    fun `URL shortener detection identifies non-shorteners`() {
+        val service = NetworkFeaturesService(defaultProperties)
+
+        // Test regular domains
+        val regularUrls = listOf(
+            "https://google.com",
+            "https://example.com",
+            "https://github.com/user/repo"
+        )
+
+        for (url in regularUrls) {
+            val features = service.collectFeatures(url)
+            assertThat(features["url_shortened"])
+                .describedAs("URL $url should not be identified as shortener")
+                .isEqualTo(0.0)
+        }
+    }
+
+    @Test
+    fun `WHOIS features disabled when configuration is false`() {
+        val properties = NetworkFeaturesProperties(
+            whois = NetworkFeaturesProperties.WhoisProperties(enabled = false)
+        )
+        val service = NetworkFeaturesService(properties)
+
+        val features = service.collectFeatures("https://example.com")
+
+        assertThat(features).doesNotContainKey("time_domain_activation")
+        assertThat(features).doesNotContainKey("time_domain_expiration")
     }
 
     // Integration tests - disabled by default (require network access)
