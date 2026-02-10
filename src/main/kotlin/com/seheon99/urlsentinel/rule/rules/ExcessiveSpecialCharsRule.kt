@@ -21,6 +21,7 @@ class ExcessiveSpecialCharsRule(
             code = "EXCESSIVE_SPECIAL_CHARS",
             severity = Severity.MINOR,
             message = if (triggered) "URL contains $count special characters (threshold: ${properties.specialCharThreshold})" else "",
+            score = 10.0,
         )
     }
 }

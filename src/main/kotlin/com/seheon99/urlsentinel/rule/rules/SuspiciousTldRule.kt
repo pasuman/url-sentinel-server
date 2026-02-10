@@ -26,6 +26,7 @@ class SuspiciousTldRule(
             code = "SUSPICIOUS_TLD",
             severity = Severity.MAJOR,
             message = if (triggered) "URL uses suspicious TLD: .$tld" else "",
+            score = 20.0,
         )
     }
 }

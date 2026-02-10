@@ -26,6 +26,7 @@ class ExcessiveSubdomainsRule(
             code = "EXCESSIVE_SUBDOMAINS",
             severity = Severity.MAJOR,
             message = if (triggered) "URL has $dotCount subdomain levels (threshold: ${properties.maxSubdomains})" else "",
+            score = 20.0,
         )
     }
 }

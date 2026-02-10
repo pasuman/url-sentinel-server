@@ -10,9 +10,9 @@ class RuleEngineTest {
 
     @Test
     fun `engine aggregates results from all rules`() {
-        val rule1 = PhishingRule { RuleResult(triggered = true, code = "RULE_1", severity = Severity.MAJOR, message = "hit") }
-        val rule2 = PhishingRule { RuleResult(triggered = false, code = "RULE_2", severity = Severity.MINOR, message = "") }
-        val rule3 = PhishingRule { RuleResult(triggered = true, code = "RULE_3", severity = Severity.MINOR, message = "hit") }
+        val rule1 = PhishingRule { RuleResult(triggered = true, code = "RULE_1", severity = Severity.MAJOR, message = "hit", score = 20.0) }
+        val rule2 = PhishingRule { RuleResult(triggered = false, code = "RULE_2", severity = Severity.MINOR, message = "", score = 10.0) }
+        val rule3 = PhishingRule { RuleResult(triggered = true, code = "RULE_3", severity = Severity.MINOR, message = "hit", score = 10.0) }
 
         val engine = RuleEngine(
             rules = listOf(rule1, rule2, rule3),
@@ -29,7 +29,7 @@ class RuleEngineTest {
     @Test
     fun `engine caps risk score at 100`() {
         val rules = (1..5).map { i ->
-            PhishingRule { RuleResult(triggered = true, code = "RULE_$i", severity = Severity.CRITICAL, message = "hit") }
+            PhishingRule { RuleResult(triggered = true, code = "RULE_$i", severity = Severity.CRITICAL, message = "hit", score = 40.0) }
         }
 
         val engine = RuleEngine(
@@ -44,7 +44,7 @@ class RuleEngineTest {
 
     @Test
     fun `safe URL returns ALLOW with no reasons`() {
-        val rule = PhishingRule { RuleResult(triggered = false, code = "SAFE", severity = Severity.MINOR, message = "") }
+        val rule = PhishingRule { RuleResult(triggered = false, code = "SAFE", severity = Severity.MINOR, message = "", score = 10.0) }
 
         val engine = RuleEngine(
             rules = listOf(rule),

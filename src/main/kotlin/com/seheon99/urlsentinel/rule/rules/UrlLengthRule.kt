@@ -18,6 +18,7 @@ class UrlLengthRule(
             code = "URL_TOO_LONG",
             severity = Severity.MINOR,
             message = if (triggered) "URL length (${url.length}) exceeds threshold (${properties.maxUrlLength})" else "",
+            score = 10.0,
         )
     }
 }

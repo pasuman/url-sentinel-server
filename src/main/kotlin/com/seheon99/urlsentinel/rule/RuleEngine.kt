@@ -21,7 +21,7 @@ class RuleEngine(
         val results = rules.map { it.evaluate(url) }
         val triggered = results.filter { it.triggered }
         val verdict = decisionEngine.decide(results)
-        val riskScore = triggered.sumOf { it.severity.weight }.coerceAtMost(100)
+        val riskScore = triggered.sumOf { it.score.toInt() }.coerceAtMost(100)
 
         return UrlCheckResponse(
             verdict = verdict,

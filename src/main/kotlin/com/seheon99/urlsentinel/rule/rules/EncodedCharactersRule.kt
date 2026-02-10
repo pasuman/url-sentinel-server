@@ -21,6 +21,7 @@ class EncodedCharactersRule(
             code = "ENCODED_CHARACTERS",
             severity = Severity.MINOR,
             message = if (triggered) "URL contains $count encoded characters (threshold: ${properties.encodedCharThreshold})" else "",
+            score = 10.0,
         )
     }
 }

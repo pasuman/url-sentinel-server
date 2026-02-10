@@ -20,7 +20,7 @@ class DefaultVerdictPolicy(
             return Verdict.REJECT
         }
 
-        val totalScore = triggered.sumOf { it.severity.weight }
+        val totalScore = triggered.sumOf { it.score.toInt() }
         if (totalScore >= properties.riskScoreThreshold) {
             return Verdict.REJECT
         }

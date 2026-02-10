@@ -15,7 +15,7 @@ interface AiAdapter {
      * @param networkFeatures Optional network features for enhanced detection
      * @return Classification result with probability and verdict
      */
-    fun classify(url: String, networkFeatures: Map<String, Double>? = null): AiClassificationResult
+    fun classify(url: String, networkFeatures: Map<String, Double>): AiClassificationResult
 }
 
 /**

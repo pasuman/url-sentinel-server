@@ -25,6 +25,7 @@ class UrlShortenerRule(
             code = "URL_SHORTENER",
             severity = Severity.MAJOR,
             message = if (triggered) "URL uses a known URL shortener service" else "",
+            score = 20.0,
         )
     }
 }

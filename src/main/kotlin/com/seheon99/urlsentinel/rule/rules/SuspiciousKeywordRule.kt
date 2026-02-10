@@ -20,6 +20,7 @@ class SuspiciousKeywordRule(
             code = "SUSPICIOUS_KEYWORD",
             severity = Severity.MAJOR,
             message = if (triggered) "URL contains suspicious keywords: ${matched.joinToString()}" else "",
+            score = 20.0,
         )
     }
 }

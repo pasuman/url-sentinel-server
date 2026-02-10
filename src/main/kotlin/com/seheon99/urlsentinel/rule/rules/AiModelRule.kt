@@ -32,28 +32,27 @@ class AiModelRule(
         }
 
         val result = try {
-            aiAdapter.classify(url, networkFeatures.ifEmpty { null })
+            aiAdapter.classify(url, networkFeatures)
         } catch (e: Exception) {
             logger.warn("AI service unavailable, skipping AI rule: {}", e.message)
             return RuleResult(
                 triggered = false,
                 code = "AI_MODEL_PHISHING",
-                severity = Severity.CRITICAL,
+                severity = Severity.MAJOR,
                 message = "",
+                score = 0.0, // AI service unavailable, contribute no score
             )
         }
 
-        // Use probability-based scoring (0-40 points based on confidence)
-        val score = result.phishingProbability * 40.0
-
+        // Always trigger if probability > 0 to ensure score contributes to decision
         return RuleResult(
-            triggered = result.isPhishing,
+            triggered = result.phishingProbability > 0,
             code = "AI_MODEL_PHISHING",
-            severity = Severity.CRITICAL,
+            severity = Severity.MAJOR,
             message = if (result.isPhishing)
                 "AI model flagged as phishing (probability: ${"%.2f".format(result.phishingProbability)})"
             else "",
-            score = score,
+            score = result.phishingProbability * 40.0, // Use probability-based scoring (0-40 points based on confidence)
         )
     }
 }

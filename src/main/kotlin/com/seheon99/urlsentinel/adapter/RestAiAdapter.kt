@@ -16,7 +16,7 @@ class RestAiAdapter(
     private val aiRestClient: RestClient,
 ) : AiAdapter {
 
-    override fun classify(url: String, networkFeatures: Map<String, Double>?): AiClassificationResult {
+    override fun classify(url: String, networkFeatures: Map<String, Double>): AiClassificationResult {
         val response = aiRestClient
             .post()
             .uri("/classify")
@@ -35,7 +35,7 @@ class RestAiAdapter(
     // Internal DTOs for REST communication
     private data class AiClassifyRequest(
         val url: String,
-        @param:JsonProperty("network_features") val networkFeatures: Map<String, Double>? = null,
+        @param:JsonProperty("network_features") val networkFeatures: Map<String, Double>,
     )
 
     private data class AiClassifyResponse(

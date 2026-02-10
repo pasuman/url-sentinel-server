@@ -24,6 +24,7 @@ class IpAddressDomainRule : PhishingRule {
             code = "IP_ADDRESS_DOMAIN",
             severity = Severity.CRITICAL,
             message = if (triggered) "URL uses an IP address instead of a domain name" else "",
+            score = 40.0,
         )
     }
 }
