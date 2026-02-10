@@ -37,7 +37,7 @@ urlsentinel:
       chain-validation:
         enabled: true
         pass-score: 10
-        fail-score: -40
+        fail-score: -10
       multi-region:
         enabled: false
         pass-score: 5

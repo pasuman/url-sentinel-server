@@ -52,7 +52,7 @@ The system follows a **security-first, clean layered architecture**:
 - `VerificationDecisionEngine` → maps scores to three-tier verdicts
 - **Six verification checks (all auto-discovered `@Component`):**
   - `SpkiMatchCheck` - Public key comparison (+50/-40) - **Critical check**
-  - `ChainValidatesCheck` - Certificate chain validation (+10/-40) - **Critical check**
+  - `ChainValidatesCheck` - Certificate chain validation (+10/-10)
   - `IpAsnMatchCheck` - ASN comparison for DNS hijacking detection (+20/-20)
   - `CtLogPresenceCheck` - Certificate Transparency validation (+30/-15)
   - `TlsMetadataMatchCheck` - Protocol/cipher/ALPN comparison (+10/-10)
