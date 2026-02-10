@@ -35,7 +35,7 @@ class DefaultDecisionEngine(
         }
 
         // High total risk score triggers rejection
-        val totalScore = triggered.sumOf { it.severity.weight }
+        val totalScore = triggered.sumOf { it.score?.toInt() ?: it.severity.weight }
         if (totalScore >= properties.riskScoreThreshold) {
             return Verdict.REJECT
         }

@@ -43,6 +43,9 @@ class AiModelRule(
             )
         }
 
+        // Use probability-based scoring (0-40 points based on confidence)
+        val score = result.phishingProbability * 40.0
+
         return RuleResult(
             triggered = result.isPhishing,
             code = "AI_MODEL_PHISHING",
@@ -50,6 +53,7 @@ class AiModelRule(
             message = if (result.isPhishing)
                 "AI model flagged as phishing (probability: ${"%.2f".format(result.phishingProbability)})"
             else "",
+            score = score,
         )
     }
 }
