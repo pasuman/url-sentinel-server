@@ -17,6 +17,11 @@ urlsentinel:
     enabled: true
     dns:
       enabled: true
+      timeout: 5000
+      spf-enabled: true
+      mx-enabled: true
+      ns-enabled: true
+      ttl-enabled: true
     ssl:
       enabled: true
     http:
@@ -24,6 +29,9 @@ urlsentinel:
       connect-timeout: 5000
       read-timeout: 5000
       max-redirects: 10
+    whois:
+      enabled: true
+      timeout: 10000
   rules:
     max-url-length: 200
     special-char-threshold: 8
