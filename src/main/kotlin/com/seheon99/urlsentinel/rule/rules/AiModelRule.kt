@@ -48,11 +48,11 @@ class AiModelRule(
         return RuleResult(
             triggered = result.phishingProbability > 0,
             code = "AI_MODEL_PHISHING",
-            severity = Severity.MAJOR,
+            severity = if (result.phishingProbability > 0.65) Severity.CRITICAL else Severity.MAJOR,
             message = if (result.isPhishing)
                 "AI model flagged as phishing (probability: ${"%.2f".format(result.phishingProbability)})"
             else "",
-            score = result.phishingProbability * 40.0, // Use probability-based scoring (0-40 points based on confidence)
+            score = result.phishingProbability * 60.0, // Use probability-based scoring (0-60 points based on confidence)
         )
     }
 }

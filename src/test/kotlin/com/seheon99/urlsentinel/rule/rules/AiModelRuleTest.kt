@@ -20,7 +20,7 @@ class AiModelRuleTest {
     private val rule = AiModelRule(aiAdapter, networkFeaturesService)
 
     @Test
-    fun `phishing URL triggers with MAJOR severity`() {
+    fun `phishing URL triggers with CRITICAL severity when probability is high`() {
         `when`(networkFeaturesService.collectFeatures(anyString())).thenReturn(
             mapOf("time_response" to 100.0, "qty_ip_resolved" to 1.0)
         )
@@ -30,7 +30,7 @@ class AiModelRuleTest {
 
         val result = rule.evaluate("http://evil.com/login")
         assertTrue(result.triggered)
-        assertEquals(Severity.MAJOR, result.severity)
+        assertEquals(Severity.CRITICAL, result.severity)
         assertEquals("AI_MODEL_PHISHING", result.code)
         assertTrue(result.message.contains("0.92"))
     }
@@ -46,7 +46,7 @@ class AiModelRuleTest {
 
         val result = rule.evaluate("https://www.google.com")
         assertTrue(result.triggered) // Now triggers with low probability
-        assertEquals(2.0, result.score) // Low score: 0.05 × 40 = 2.0
+        assertEquals(3.0, result.score) // Low score: 0.05 × 60 = 3.0
     }
 
     @Test
@@ -68,7 +68,7 @@ class AiModelRuleTest {
 
         val result = rule.evaluate("https://example.com")
         assertTrue(result.triggered) // Triggers with 0.3 probability
-        assertEquals(12.0, result.score) // 0.3 × 40 = 12.0
+        assertEquals(18.0, result.score) // 0.3 × 60 = 18.0
     }
 
     @Test
@@ -79,7 +79,8 @@ class AiModelRuleTest {
         )
 
         val result = rule.evaluate("http://evil.com")
-        assertEquals(38.0, result.score) // 0.95 × 40 = 38.0
+        assertEquals(57.0, result.score) // 0.95 × 60 = 57.0
+        assertEquals(Severity.CRITICAL, result.severity) // 0.95 > 0.65 → CRITICAL
     }
 
     @Test
@@ -90,7 +91,7 @@ class AiModelRuleTest {
         )
 
         val result = rule.evaluate("http://suspicious.com")
-        assertEquals(20.0, result.score) // 0.5 × 40 = 20.0
+        assertEquals(30.0, result.score) // 0.5 × 60 = 30.0
     }
 
     @Test
@@ -101,7 +102,7 @@ class AiModelRuleTest {
         )
 
         val result = rule.evaluate("https://google.com")
-        assertEquals(2.0, result.score) // 0.05 × 40 = 2.0
+        assertEquals(3.0, result.score) // 0.05 × 60 = 3.0
     }
 
     @Test
@@ -113,7 +114,7 @@ class AiModelRuleTest {
 
         val result = rule.evaluate("https://safe.com")
         assertFalse(result.triggered) // Does not trigger when probability is 0.0
-        assertEquals(0.0, result.score) // 0.0 × 40 = 0.0
+        assertEquals(0.0, result.score) // 0.0 × 60 = 0.0
     }
 
     @Test
@@ -124,6 +125,40 @@ class AiModelRuleTest {
         )
 
         val result = rule.evaluate("http://phishing.com")
-        assertEquals(40.0, result.score) // 1.0 × 40 = 40.0
+        assertEquals(60.0, result.score) // 1.0 × 60 = 60.0
+        assertEquals(Severity.CRITICAL, result.severity) // 1.0 > 0.65 → CRITICAL
+    }
+
+    @Test
+    fun `severity is CRITICAL when probability is above 0_65 threshold`() {
+        `when`(networkFeaturesService.collectFeatures(anyString())).thenReturn(emptyMap())
+        `when`(aiAdapter.classify(anyString(), anyMap())).thenReturn(
+            AiClassificationResult(url = "http://suspicious.com", phishingProbability = 0.66, isPhishing = true),
+        )
+
+        val result = rule.evaluate("http://suspicious.com")
+        assertEquals(Severity.CRITICAL, result.severity)
+    }
+
+    @Test
+    fun `severity is MAJOR when probability is at or below 0_65 threshold`() {
+        `when`(networkFeaturesService.collectFeatures(anyString())).thenReturn(emptyMap())
+        `when`(aiAdapter.classify(anyString(), anyMap())).thenReturn(
+            AiClassificationResult(url = "http://borderline.com", phishingProbability = 0.65, isPhishing = false),
+        )
+
+        val result = rule.evaluate("http://borderline.com")
+        assertEquals(Severity.MAJOR, result.severity)
+    }
+
+    @Test
+    fun `severity is MAJOR when probability is below threshold`() {
+        `when`(networkFeaturesService.collectFeatures(anyString())).thenReturn(emptyMap())
+        `when`(aiAdapter.classify(anyString(), anyMap())).thenReturn(
+            AiClassificationResult(url = "http://low.com", phishingProbability = 0.30, isPhishing = false),
+        )
+
+        val result = rule.evaluate("http://low.com")
+        assertEquals(Severity.MAJOR, result.severity)
     }
 }
